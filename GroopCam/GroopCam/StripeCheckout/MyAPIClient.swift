@@ -25,7 +25,7 @@ class MyAPIClient: NSObject, STPCustomerEphemeralKeyProvider {
         }
     }
     
-    func createPaymentIntent(products: [QuantityObject], shippingMethod: PKShippingMethod?, shippingAddress: STPAddress?, country: String? = nil, completion: @escaping ((Result<String, Error>) -> Void)) {
+    func createPaymentIntent(paymentContext: STPPaymentContext, products: [QuantityObject], completion: @escaping ((Result<String, Error>) -> Void)) {
         let url = self.baseURL.appendingPathComponent("create_payment_intent")
         var params: [String: Any] = [
             "metadata": [
@@ -38,20 +38,16 @@ class MyAPIClient: NSObject, STPCustomerEphemeralKeyProvider {
             let st = "(" + String(product.quantity) + " , " + product.printableObject.post.imageUrl + "), "
             desc.append(st)
         }
-        if let shippingAddress = shippingAddress {
-            params["description"] = shippingAddress.email ?? "" + " " + desc
+        if let shippingAddress = paymentContext.shippingAddress {
+            params["description"] = shippingAddress.email ?? shippingAddress.phone! + " " + desc
         }
-//        params["products"] = products.map({ (p) -> String in
-//            return p.printableObject.post.imageUrl
-//        })
-        if let shippingMethod = shippingMethod {
-            params["shipping"] = shippingMethod.identifier
-        }
-        params["country"] = country
+        params["amount"] = paymentContext.paymentAmount
+
         let jsonData = try? JSONSerialization.data(withJSONObject: params)
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.httpBody = jsonData
         let task = URLSession.shared.dataTask(with: request, completionHandler: { (data, response, error) in
             guard let response = response as? HTTPURLResponse,
